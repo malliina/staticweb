@@ -27,7 +27,7 @@ const WebApp = function (env, argv) {
       ]
     },
     output: {
-      filename: "[name].[chunkhash].js",
+      filename: '[name].[chunkhash].js',
       path: path.resolve(rootDir, env.dist)
     },
     plugins: [
@@ -36,7 +36,7 @@ const WebApp = function (env, argv) {
         excludeAssets: [/styles.*.js/, /fonts.*.js/] // excludes redundant js from styles chunk (but includes css)
       }),
       new HtmlWebpackExcludeAssetsPlugin(),
-      new MiniCssExtractPlugin({filename: "[name].[contenthash].css"})
+      new MiniCssExtractPlugin({filename: '[name].[contenthash].css'})
     ]
   });
 };
