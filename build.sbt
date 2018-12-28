@@ -16,6 +16,7 @@ webpackConfigFile in fastOptJS := Some(baseDirectory.value / "webpack.dev.config
 
 webpackBundlingMode in fullOptJS := BundlingMode.Application
 webpackConfigFile in fullOptJS := Some(baseDirectory.value / "webpack.prod.config.js")
+webpackExtraArgs in fullOptJS := Seq(s"--env.dist=${distPath.value}")
 
 npmDevDependencies in Compile ++= Seq(
   "html-webpack-plugin" -> "3.0.6",
@@ -41,11 +42,13 @@ libraryDependencies ++= Seq(
   "org.scalatest" %%% "scalatest" % "3.0.5" % Test
 )
 
+val distPath = settingKey[String]("Path to built prod distribution (relative to base directory)")
 val distDirectory = settingKey[Path]("Prod distribution directory")
 val cleanDist = taskKey[Unit]("Cleans dist directory")
 val deploy = taskKey[Unit]("Deploys the application")
 
-distDirectory := (baseDirectory.value / "dist").toPath
+distPath := "dist"
+distDirectory := (baseDirectory.value / distPath.value).toPath
 cleanDist := GCP.deleteDirectory(distDirectory.value)
 deploy := GCP(distDirectory.value, streams.value.log).deploy()
 deploy := ((deploy dependsOn (webpack in (Compile, fullOptJS))) dependsOn cleanDist).value
