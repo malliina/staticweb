@@ -1,0 +1,1 @@
+import './staticweb.pcss'
