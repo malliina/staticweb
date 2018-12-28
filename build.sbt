@@ -19,9 +19,9 @@ webpackConfigFile in fullOptJS := Some(baseDirectory.value / "webpack.prod.confi
 webpackExtraArgs in fullOptJS := Seq(s"--env.dist=${distPath.value}")
 
 npmDevDependencies in Compile ++= Seq(
-  "html-webpack-plugin" -> "3.0.6",
-  "html-webpack-exclude-assets-plugin" -> "0.0.7",
-  "html-webpack-include-assets-plugin" -> "1.0.6",
+//  "html-webpack-plugin" -> "3.0.6",
+//  "html-webpack-exclude-assets-plugin" -> "0.0.7",
+//  "html-webpack-include-assets-plugin" -> "1.0.6",
   "webpack-merge" -> "4.1.5",
   "style-loader" -> "0.23.1",
   "css-loader" -> "2.1.0",
@@ -48,7 +48,19 @@ val cleanDist = taskKey[Unit]("Cleans dist directory")
 val deploy = taskKey[Unit]("Deploys the application")
 
 distPath := "dist"
+(webpack in(Compile, fastOptJS)) := {
+  val files = (webpack in(Compile, fastOptJS)).value
+  Html.generate(files, (crossTarget in(Compile, fastOptJS)).value.toPath, Nil, streams.value.log)
+  files
+}
+(webpack in(Compile, fullOptJS)) := {
+  val files = (webpack in(Compile, fullOptJS)).value
+  // Excludes scripts emitted from CSS extraction
+  val excludedScripts = Seq("styles", "fonts")
+  Html.generate(files, distDirectory.value, excludedScripts, streams.value.log)
+  files
+}
 distDirectory := (baseDirectory.value / distPath.value).toPath
 cleanDist := GCP.deleteDirectory(distDirectory.value)
 deploy := GCP(distDirectory.value, streams.value.log).deploy()
-deploy := ((deploy dependsOn (webpack in (Compile, fullOptJS))) dependsOn cleanDist).value
+deploy := ((deploy dependsOn (webpack in(Compile, fullOptJS))) dependsOn cleanDist).value

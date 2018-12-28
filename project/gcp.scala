@@ -100,6 +100,11 @@ class GCP(dist: Path, bucketName: String, log: ManagedLogger, client: StorageCli
       bucket.toBuilder.setIndexPage(index).build().update()
       log.info(s"Set index page to '$index'.")
     }
+    val notfound = "notfound.html"
+    if (files.exists(_.getFileName.toString == notfound)) {
+      bucket.toBuilder.setNotFoundPage(notfound).build().update()
+      log.info(s"Set 404 page to '$notfound'.")
+    }
     log.info(s"Deployed to '$bucketName'.")
   }
 }
