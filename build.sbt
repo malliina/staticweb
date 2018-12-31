@@ -3,19 +3,19 @@ import java.nio.file.Path
 import autowire._
 import com.lihaoyi.workbench.Api
 import com.lihaoyi.workbench.WorkbenchBasePlugin.server
-import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
+import sbtcrossproject.CrossPlugin.autoImport.crossProject
+
 import scala.concurrent.ExecutionContext
 
 val distPath = settingKey[String]("Path to built prod distribution (relative to base directory)")
 val distDirectory = settingKey[Path]("Prod distribution directory")
-val cleanDist = taskKey[Unit]("Cleans dist directory")
 val deploy = taskKey[Unit]("Deploys the application")
 val build = taskKey[Unit]("Builds the content")
 val prepare = taskKey[Unit]("Generates the site for deployment")
 val Static = config("static")
 
 ThisBuild / distPath := "dist"
-ThisBuild / distDirectory := (baseDirectory.value / distPath.value).toPath
+ThisBuild / distDirectory := (target.value / distPath.value).toPath
 
 val commonSettings = Seq(
   version := "0.0.1",
@@ -40,17 +40,16 @@ val client: Project = project.in(file("client"))
     webpackConfigFile in fastOptJS := Some(baseDirectory.value / "webpack.dev.config.js"),
     webpackBundlingMode in fullOptJS := BundlingMode.Application,
     webpackConfigFile in fullOptJS := Some(baseDirectory.value / "webpack.prod.config.js"),
-    webpackExtraArgs in fullOptJS := Seq(s"--env.dist=../${distPath.value}"),
     npmDevDependencies in Compile ++= Seq(
-      "webpack-merge" -> "4.1.5",
-      "style-loader" -> "0.23.1",
+      "autoprefixer" -> "9.4.3",
+      "cssnano" -> "4.1.8",
       "css-loader" -> "2.1.0",
       "mini-css-extract-plugin" -> "0.5.0",
       "postcss-loader" -> "3.0.0",
       "postcss-import" -> "12.0.1",
       "postcss-preset-env" -> "6.5.0",
-      "autoprefixer" -> "9.4.3",
-      "cssnano" -> "4.1.8"
+      "style-loader" -> "0.23.1",
+      "webpack-merge" -> "4.1.5"
     ),
     scalaJSUseMainModuleInitializer := true,
     libraryDependencies ++= Seq(
@@ -65,8 +64,7 @@ val content: Project = project.in(file("content"))
   .dependsOn(sharedJvm)
   .settings(commonSettings)
   .settings(
-    version := "0.0.1",
-    scalaVersion := "2.12.8",
+    exportJars := false,
     libraryDependencies ++= Seq(
       "com.google.cloud" % "google-cloud-storage" % "1.55.0",
       "com.lihaoyi" %% "scalatags" % "0.6.7",
@@ -76,15 +74,8 @@ val content: Project = project.in(file("content"))
     ),
     build := Def.taskDyn {
       val files = webpack.in(client, Compile, fastOptJS in client).value
-      files.foreach { f =>
-        val meta = f.metadata.get(BundlerFileTypeAttr)
-        // With BundlingMode.LibraryOnly(), these two are not processed by webpack, so we copy them manually
-        if (meta.contains(BundlerFileType.Loader) || meta.contains(BundlerFileType.Application)) {
-          IO.copyFile(f.data, distDirectory.value.resolve(f.data.name).toFile)
-        }
-      }
       val excludedScripts = Seq("styles", "fonts")
-      val assets = AssetUtils.assetGroup(files, excludedScripts).mkString
+      val assets = AssetUtils.prepareRelative(files, excludedScripts, distDirectory.value)
       run in Compile toTask s" build ${distDirectory.value} /workbench.js $assets"
     }.value,
     // Watches both JS sources and content sources, so that recompilation is triggered when either changes
@@ -94,14 +85,12 @@ val content: Project = project.in(file("content"))
       (server in client).value.Wire[Api].reload().call()
     },
     refreshBrowsers := refreshBrowsers.triggeredBy(build).value,
-    clean in Static := {
-      AssetUtils.deleteDirectory(distDirectory.value)
-    },
+    clean in Static := AssetUtils.deleteDirectory(distDirectory.value),
     prepare := Def.taskDyn {
       val files = webpack.in(client, Compile, fullOptJS in client).value
       // Excludes scripts emitted from CSS extraction
       val excludedScripts = Seq("styles", "fonts")
-      val assets = AssetUtils.assetGroup(files, excludedScripts).mkString
+      val assets = AssetUtils.prepareRelative(files, excludedScripts, distDirectory.value)
       run in Compile toTask s" build ${distDirectory.value} $assets"
     }.dependsOn(clean in Static).value,
     deploy := Def.taskDyn {

@@ -7,11 +7,29 @@ import scalajsbundler.sbtplugin.ScalaJSBundlerPlugin.autoImport.{BundlerFileType
 
 object AssetUtils {
 
-  case class AssetGroup(scripts: Seq[String], styles: Seq[String]) {
-    def mkString = (styles ++ scripts).mkString(" ")
+  case class AssetGroup(scripts: Seq[File], styles: Seq[File])
+
+  def prepareRelative(files: Seq[Attributed[File]], excludePrefixes: Seq[String], base: Path) = {
+    val eligible = assetGroup(files, excludePrefixes)
+    val assetsDir = base.toFile / "assets"
+
+    def copyAndRelativize(subDir: String, file: File) = {
+      val dest = assetsDir / subDir / file.name
+      if (file.getAbsolutePath != dest.getAbsolutePath)
+        IO.copyFile(file, dest)
+      base.relativize(dest.toPath)
+    }
+
+    val relative =
+      eligible.styles.map(copyAndRelativize("css", _)) ++
+        eligible.scripts.map(copyAndRelativize("js", _))
+    relative.map { p =>
+      val r = p.toFile.getPath
+      if (r.startsWith("/")) r else s"/$r"
+    }.mkString(" ")
   }
 
-  def assetGroup(files: Seq[sbt.Attributed[sbt.File]], excludePrefixes: Seq[String]): AssetGroup = {
+  def assetGroup(files: Seq[Attributed[File]], excludePrefixes: Seq[String]): AssetGroup = {
     def filesOf(fileType: BundlerFileType) = files.filter(_.metadata.get(BundlerFileTypeAttr).contains(fileType))
 
     // Separates app scripts from library ones for ordering
@@ -21,8 +39,8 @@ object AssetUtils {
     val loaders = filesOf(BundlerFileType.Loader)
     val scripts = (apps ++ loaders ++ assets ++ libraries).distinct.reverse.map(_.data)
       .filter(f => f.ext == "js" && !excludePrefixes.exists(e => f.name.startsWith(e)))
-      .map(_.name).distinct
-    val styles = files.map(_.data).filter(_.ext == "css").map(_.name)
+      .distinct
+    val styles = files.map(_.data).filter(_.ext == "css")
     AssetGroup(scripts, styles)
   }
 

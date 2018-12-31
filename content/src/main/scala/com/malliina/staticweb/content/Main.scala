@@ -11,7 +11,7 @@ object Main {
         val files = args.drop(2)
         val css = files.filter(_.endsWith(".css"))
         val js = files.filter(_.endsWith(".js"))
-        Html.generate(SiteSpec(css, js, target))
+        Generator.generate(SiteSpec(css, js, target))
       case "deploy" =>
         val bucket = args(2)
         GCP(target, bucket).deploy()
