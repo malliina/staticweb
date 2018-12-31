@@ -28,5 +28,8 @@ To deploy the app to [static.malliina.com](https://static.malliina.com), run:
 
     sbt content/deploy
 
-The *deploy* command builds and outputs assets to the *dist* directory, then uploads gzipped versions of the files to 
-Google Cloud Storage.
+The *deploy* command:
+ 
+1. Builds the CSS and JavaScript assets
+1. Generates HTML files that may use the built assets
+1. Uploads gzipped versions of the files to Google Cloud Storage
