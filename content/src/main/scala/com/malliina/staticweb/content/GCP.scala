@@ -58,6 +58,11 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
     "html" -> "public, max-age=10"
   )
 
+  def keyFor(file: Path) = {
+    val relativePath = dist.relativize(file).toString.replace('\\', '/')
+    if (relativePath.startsWith("/")) relativePath.drop(1) else relativePath
+  }
+
   def deploy(): Unit = {
     val files = Files.list(dist).iterator().asScala.toList
     files.foreach { file =>
@@ -68,7 +73,7 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
       val cacheControl =
         if (isFingerprinted) cacheControls.getOrElse(extension, defaultCacheControl)
         else defaultCacheControl
-      val blob = BlobInfo.newBuilder(bucketName, name)
+      val blob = BlobInfo.newBuilder(bucketName, keyFor(file))
         .setContentType(contentType)
         .setAcl(mutable.Buffer(Acl.of(User.ofAllUsers(), Role.READER)).asJava)
         .setContentEncoding("gzip")
@@ -79,15 +84,13 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
       client.upload(blob, gzipFile)
       log.info(s"Uploaded '$file' as '$contentType' to '$bucketName'.")
     }
-    val index = "index.html"
-    if (files.exists(_.getFileName.toString == index)) {
-      bucket.toBuilder.setIndexPage(index).build().update()
-      log.info(s"Set index page to '$index'.")
+    files.find(_.getFileName.toString == "index.html").foreach { indexFile =>
+      bucket.toBuilder.setIndexPage(keyFor(indexFile)).build().update()
+      log.info(s"Set index page to '$indexFile'.")
     }
-    val notfound = "notfound.html"
-    if (files.exists(_.getFileName.toString == notfound)) {
-      bucket.toBuilder.setNotFoundPage(notfound).build().update()
-      log.info(s"Set 404 page to '$notfound'.")
+    files.find(_.getFileName.toString == "notfound.html").foreach { notFoundFile =>
+      bucket.toBuilder.setNotFoundPage(keyFor(notFoundFile)).build().update()
+      log.info(s"Set 404 page to '$notFoundFile'.")
     }
     log.info(s"Deployed to '$bucketName'.")
   }
