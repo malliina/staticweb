@@ -64,7 +64,7 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
   }
 
   def deploy(): Unit = {
-    val files = Files.list(dist).iterator().asScala.toList
+    val files = Files.walk(dist).iterator().asScala.toList.filter(p => Files.isRegularFile(p))
     files.foreach { file =>
       val name = file.getFileName.toString
       val extension = ext(file)
@@ -73,7 +73,8 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
       val cacheControl =
         if (isFingerprinted) cacheControls.getOrElse(extension, defaultCacheControl)
         else defaultCacheControl
-      val blob = BlobInfo.newBuilder(bucketName, keyFor(file))
+      val key = keyFor(file)
+      val blob = BlobInfo.newBuilder(bucketName, key)
         .setContentType(contentType)
         .setAcl(mutable.Buffer(Acl.of(User.ofAllUsers(), Role.READER)).asJava)
         .setContentEncoding("gzip")
@@ -82,15 +83,17 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
       val gzipFile = Files.createTempFile(name, "gz")
       gzip(file, gzipFile)
       client.upload(blob, gzipFile)
-      log.info(s"Uploaded '$file' as '$contentType' to '$bucketName'.")
+      log.info(s"Uploaded '$file' with key '$key' as '$contentType' to '$bucketName'.")
     }
     files.find(_.getFileName.toString == "index.html").foreach { indexFile =>
-      bucket.toBuilder.setIndexPage(keyFor(indexFile)).build().update()
-      log.info(s"Set index page to '$indexFile'.")
+      val key = keyFor(indexFile)
+      bucket.toBuilder.setIndexPage(key).build().update()
+      log.info(s"Set index page to '$key'.")
     }
     files.find(_.getFileName.toString == "notfound.html").foreach { notFoundFile =>
-      bucket.toBuilder.setNotFoundPage(keyFor(notFoundFile)).build().update()
-      log.info(s"Set 404 page to '$notFoundFile'.")
+      val key = keyFor(notFoundFile)
+      bucket.toBuilder.setNotFoundPage(key).build().update()
+      log.info(s"Set 404 page to '$key'.")
     }
     log.info(s"Deployed to '$bucketName'.")
   }
