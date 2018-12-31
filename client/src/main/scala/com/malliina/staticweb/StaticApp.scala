@@ -1,5 +1,6 @@
 package com.malliina.staticweb
 
+//import org.scalajs.dom.document
 
 object StaticApp {
   def main(args: Array[String]): Unit = {
@@ -7,8 +8,8 @@ object StaticApp {
     //    val content =
     //      div(
     //        h1("Hi"),
-    //        p("Welcome to Scala.js!!")
+    //        p("Welcome to Scala.js!!!")
     //      )
-    //    org.scalajs.dom.document.body.appendChild(content.render)
+    //    document.body.appendChild(content.render)
   }
 }

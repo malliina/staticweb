@@ -1,38 +1,22 @@
-import java.io.{FileInputStream, IOException}
-import java.nio.file._
+package com.malliina.content
+
+import java.io._
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
+import java.util.zip.GZIPOutputStream
 
-import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.storage.Acl.{Role, User}
-import com.google.cloud.storage.{Acl, BlobInfo, Storage, StorageOptions}
-import sbt.fileToRichFile
-import sbt.internal.util.ManagedLogger
-import sbt.io.IO
+import com.google.cloud.storage.{Acl, BlobInfo}
+import com.malliina.content.GCP.log
+import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters.{asJavaCollectionConverter, asScalaIteratorConverter, mutableSeqAsJavaListConverter}
+import scala.collection.JavaConverters.{asScalaIteratorConverter, mutableSeqAsJavaListConverter}
 import scala.collection.mutable
 
-object StorageClient {
-  val credentialsFile = Paths.get(sys.props("user.home")).resolve(".gcp").resolve("credentials.json")
-
-  def apply(): StorageClient =
-    new StorageClient(StorageOptions.newBuilder().setCredentials(credentials).build().getService)
-
-  def credentials = {
-    val file = sys.env.get("GOOGLE_APPLICATION_CREDENTIALS").map(Paths.get(_)).getOrElse(credentialsFile)
-    GoogleCredentials.fromStream(new FileInputStream(file.toFile))
-      .createScoped(Seq("https://www.googleapis.com/auth/cloud-platform").asJavaCollection)
-  }
-}
-
-class StorageClient(val client: Storage) {
-  def bucket(name: String) = client.get(name)
-
-  def upload(blob: BlobInfo, file: Path) = client.create(blob, Files.readAllBytes(file))
-}
-
 object GCP {
-  def apply(dist: Path, log: ManagedLogger) = new GCP(dist, "static.malliina.com", log, StorageClient())
+  private val log = LoggerFactory.getLogger(getClass)
+
+  def apply(dist: Path, bucketName: String) = new GCP(dist, bucketName, StorageClient())
 
   // https://stackoverflow.com/a/27917071
   def deleteDirectory(dir: Path): Path = {
@@ -56,7 +40,7 @@ object GCP {
 
 /** Deploys files in `dist` to `bucketName` in Google Cloud Storage.
   */
-class GCP(dist: Path, bucketName: String, log: ManagedLogger, client: StorageClient) {
+class GCP(dist: Path, bucketName: String, client: StorageClient) {
   val bucket = client.bucket(bucketName)
 
   val defaultContentType = "application/octet-stream"
@@ -78,7 +62,7 @@ class GCP(dist: Path, bucketName: String, log: ManagedLogger, client: StorageCli
     val files = Files.list(dist).iterator().asScala.toList
     files.foreach { file =>
       val name = file.getFileName.toString
-      val extension = file.toFile.ext
+      val extension = ext(file)
       val contentType = contentTypes.getOrElse(extension, defaultContentType)
       val isFingerprinted = name.count(_ == '.') > 1
       val cacheControl =
@@ -91,7 +75,7 @@ class GCP(dist: Path, bucketName: String, log: ManagedLogger, client: StorageCli
         .setCacheControl(cacheControl)
         .build()
       val gzipFile = Files.createTempFile(name, "gz")
-      IO.gzip(file.toFile, gzipFile.toFile)
+      gzip(file, gzipFile)
       client.upload(blob, gzipFile)
       log.info(s"Uploaded '$file' to '$bucketName' as '$contentType'.")
     }
@@ -106,5 +90,43 @@ class GCP(dist: Path, bucketName: String, log: ManagedLogger, client: StorageCli
       log.info(s"Set 404 page to '$notfound'.")
     }
     log.info(s"Deployed to '$bucketName'.")
+  }
+
+  def gzip(src: Path, dest: Path): Unit =
+    using(new FileInputStream(src.toFile)) { in =>
+      using(new FileOutputStream(dest.toFile)) { out =>
+        using(new GZIPOutputStream(out, 8192)) { gzip =>
+          copyStream(in, gzip)
+          gzip.finish()
+        }
+      }
+    }
+
+  // Adapted from sbt-io
+  private def copyStream(in: InputStream, out: OutputStream): Unit = {
+    val buffer = new Array[Byte](8192)
+
+    def read(): Unit = {
+      val byteCount = in.read(buffer)
+      if (byteCount >= 0) {
+        out.write(buffer, 0, byteCount)
+        read()
+      }
+    }
+
+    read()
+  }
+
+  def using[T <: AutoCloseable, U](res: T)(code: T => U): U = try {
+    code(res)
+  } finally {
+    res.close()
+  }
+
+  def ext(path: Path) = {
+    val name = path.getFileName.toString
+    val idx = name.lastIndexOf('.')
+    if (idx >= 0 && name.length > idx + 1) name.substring(idx + 1)
+    else ""
   }
 }
