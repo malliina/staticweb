@@ -3,7 +3,7 @@ import java.nio.file.Path
 import autowire._
 import com.lihaoyi.workbench.Api
 import com.lihaoyi.workbench.WorkbenchBasePlugin.server
-
+import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 import scala.concurrent.ExecutionContext
 
 val distPath = settingKey[String]("Path to built prod distribution (relative to base directory)")
@@ -17,11 +17,22 @@ val Static = config("static")
 ThisBuild / distPath := "dist"
 ThisBuild / distDirectory := (baseDirectory.value / distPath.value).toPath
 
+val commonSettings = Seq(
+  version := "0.0.1",
+  scalaVersion := "2.12.8"
+)
+
+val shared = crossProject(JSPlatform, JVMPlatform)
+  .settings(commonSettings)
+
+val sharedJs = shared.js
+val sharedJvm = shared.jvm
+
 val client: Project = project.in(file("client"))
   .enablePlugins(ScalaJSBundlerPlugin, WorkbenchBasePlugin)
+  .dependsOn(sharedJs)
+  .settings(commonSettings)
   .settings(
-    version := "0.0.1",
-    scalaVersion := "2.12.8",
     version in webpack := "4.28.2",
     version in startWebpackDevServer := "3.1.4",
     emitSourceMaps := false,
@@ -51,6 +62,8 @@ val client: Project = project.in(file("client"))
   )
 
 val content: Project = project.in(file("content"))
+  .dependsOn(sharedJvm)
+  .settings(commonSettings)
   .settings(
     version := "0.0.1",
     scalaVersion := "2.12.8",
@@ -61,7 +74,6 @@ val content: Project = project.in(file("content"))
       "ch.qos.logback" % "logback-classic" % "1.2.3",
       "ch.qos.logback" % "logback-core" % "1.2.3"
     ),
-    // Dev settings
     build := Def.taskDyn {
       val files = webpack.in(client, Compile, fastOptJS in client).value
       files.foreach { f =>
@@ -82,7 +94,6 @@ val content: Project = project.in(file("content"))
       (server in client).value.Wire[Api].reload().call()
     },
     refreshBrowsers := refreshBrowsers.triggeredBy(build).value,
-    // Prod settings
     clean in Static := {
       AssetUtils.deleteDirectory(distDirectory.value)
     },

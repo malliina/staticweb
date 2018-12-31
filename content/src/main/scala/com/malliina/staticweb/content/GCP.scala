@@ -1,4 +1,4 @@
-package com.malliina.content
+package com.malliina.staticweb.content
 
 import java.io._
 import java.nio.file.attribute.BasicFileAttributes
@@ -7,7 +7,7 @@ import java.util.zip.GZIPOutputStream
 
 import com.google.cloud.storage.Acl.{Role, User}
 import com.google.cloud.storage.{Acl, BlobInfo}
-import com.malliina.content.GCP.log
+import com.malliina.staticweb.content.GCP.log
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters.{asScalaIteratorConverter, mutableSeqAsJavaListConverter}
@@ -77,7 +77,7 @@ class GCP(dist: Path, bucketName: String, client: StorageClient) {
       val gzipFile = Files.createTempFile(name, "gz")
       gzip(file, gzipFile)
       client.upload(blob, gzipFile)
-      log.info(s"Uploaded '$file' to '$bucketName' as '$contentType'.")
+      log.info(s"Uploaded '$file' as '$contentType' to '$bucketName'.")
     }
     val index = "index.html"
     if (files.exists(_.getFileName.toString == index)) {

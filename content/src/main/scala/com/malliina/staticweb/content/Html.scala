@@ -1,8 +1,9 @@
-package com.malliina.content
+package com.malliina.staticweb.content
 
 import java.nio.file.{Files, Path, StandardOpenOption}
 
-import com.malliina.content.Html.defer
+import com.malliina.staticweb.Constants.HelloContainerId
+import com.malliina.staticweb.content.Html.defer
 import org.slf4j.LoggerFactory
 import scalatags.Text.all._
 
@@ -38,9 +39,8 @@ object Html {
 
 class Html(css: Seq[String], js: Seq[String]) {
   def index = template(
-    div(
-      h1("Hi!"),
-      p("Welcome to Scala.js")
+    div(id := HelloContainerId)(
+      h1("Hi!")
     )
   )
 

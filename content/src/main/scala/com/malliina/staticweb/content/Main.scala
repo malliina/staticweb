@@ -1,4 +1,4 @@
-package com.malliina.content
+package com.malliina.staticweb.content
 
 import java.nio.file.Paths
 
