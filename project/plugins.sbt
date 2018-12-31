@@ -1,5 +1,6 @@
-addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.26")
-
-addSbtPlugin("ch.epfl.scala" % "sbt-scalajs-bundler" % "0.14.0")
-
-libraryDependencies += "com.google.cloud" % "google-cloud-storage" % "1.55.0"
+Seq(
+  "org.scala-js" % "sbt-scalajs" % "0.6.26",
+  "org.portable-scala" % "sbt-scalajs-crossproject" % "0.6.0",
+  "ch.epfl.scala" % "sbt-scalajs-bundler" % "0.14.0",
+  "com.lihaoyi" % "workbench" % "0.4.1"
+).map(addSbtPlugin)

@@ -1,4 +1,4 @@
-package com.malliina.staticweb
+package com.malliina.staticweb.js
 
 import org.scalatest.FunSuite
 
