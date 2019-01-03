@@ -14,16 +14,16 @@ val build = taskKey[Unit]("Builds the content")
 val prepare = taskKey[Unit]("Generates the site for deployment")
 val Static = config("static")
 
-ThisBuild / distPath := "dist"
-ThisBuild / distDirectory := (target.value / distPath.value).toPath
-
-val commonSettings = Seq(
-  version := "0.0.1",
-  scalaVersion := "2.12.8"
+inThisBuild(
+  Seq(
+    version := "0.0.1",
+    scalaVersion := "2.12.8",
+    distPath := "dist",
+    distDirectory := (baseDirectory.in(ThisBuild).value / "target" / distPath.value).toPath
+  )
 )
 
 val shared = crossProject(JSPlatform, JVMPlatform)
-  .settings(commonSettings)
 
 val sharedJs = shared.js
 val sharedJvm = shared.jvm
@@ -31,7 +31,6 @@ val sharedJvm = shared.jvm
 val client: Project = project.in(file("client"))
   .enablePlugins(ScalaJSBundlerPlugin, WorkbenchBasePlugin)
   .dependsOn(sharedJs)
-  .settings(commonSettings)
   .settings(
     version in webpack := "4.28.2",
     version in startWebpackDevServer := "3.1.4",
@@ -62,7 +61,6 @@ val client: Project = project.in(file("client"))
 
 val content: Project = project.in(file("content"))
   .dependsOn(sharedJvm)
-  .settings(commonSettings)
   .settings(
     exportJars := false,
     libraryDependencies ++= Seq(
@@ -97,4 +95,22 @@ val content: Project = project.in(file("content"))
       run in Compile toTask s" deploy ${distDirectory.value} static.malliina.com"
     }.value,
     deploy := (deploy dependsOn prepare).value
+  )
+
+val docs = project.in(file("docs"))
+  .settings(
+    unmanagedSourceDirectories in Compile += baseDirectory.value / "code"
+  )
+
+val mdoc = project
+  .in(file("mdoc"))
+  .dependsOn(content)
+  .enablePlugins(MdocPlugin)
+  .settings(
+    mdocJS := Option(client),
+    mdocVariables := Map(
+      "VERSION" -> version.value
+    ),
+    resolvers += Resolver.bintrayRepo("cibotech", "public"),
+    libraryDependencies += "com.cibo" %%% "evilplot" % "0.6.3"
   )
